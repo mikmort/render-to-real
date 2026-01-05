@@ -7,7 +7,11 @@ function App() {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [transformedImage, setTransformedImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState(null);
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [sceneAnalysis, setSceneAnalysis] = useState('');
+  const [uploadedFilename, setUploadedFilename] = useState(null);
 
   const handleDrag = useCallback((e) => {
     e.preventDefault();
@@ -36,7 +40,7 @@ function App() {
     }
   };
 
-  const handleFile = (file) => {
+  const handleFile = async (file) => {
     if (!file.type.startsWith('image/')) {
       setError('Please upload an image file');
       return;
@@ -45,12 +49,46 @@ function App() {
     setSelectedImage(file);
     setError(null);
     setTransformedImage(null);
+    setSceneAnalysis('');
+    setCustomInstructions('');
 
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreviewUrl(reader.result);
     };
     reader.readAsDataURL(file);
+
+    // Analyze the scene
+    await analyzeImage(file);
+  };
+
+  const analyzeImage = async (file) => {
+    setAnalyzing(true);
+    setError(null);
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const response = await fetch('http://localhost:5000/api/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to analyze image');
+      }
+
+      setSceneAnalysis(data.analysis);
+      setUploadedFilename(data.filename);
+    } catch (err) {
+      setError('Scene analysis failed: ' + err.message);
+      console.error('Error:', err);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const transformImage = async () => {
@@ -61,6 +99,12 @@ function App() {
 
     const formData = new FormData();
     formData.append('image', selectedImage);
+    if (sceneAnalysis.trim()) {
+      formData.append('sceneAnalysis', sceneAnalysis.trim());
+    }
+    if (customInstructions.trim()) {
+      formData.append('instructions', customInstructions.trim());
+    }
 
     try {
       const response = await fetch('http://localhost:5000/api/transform', {
@@ -158,24 +202,63 @@ function App() {
           </div>
         )}
 
-        {previewUrl && (
+        {analyzing && (
+          <div className="analyzing-message">
+            <span className="spinner"></span>
+            Analyzing scene with AI...
+          </div>
+        )}
+
+        {previewUrl && sceneAnalysis && (
+          <div className="analysis-container">
+            <label htmlFor="analysis" className="analysis-label">
+              Detected Objects & Materials (Edit as needed)
+            </label>
+            <textarea
+              id="analysis"
+              className="analysis-input"
+              value={sceneAnalysis}
+              onChange={(e) => setSceneAnalysis(e.target.value)}
+              rows={8}
+            />
+            <p className="analysis-hint">
+              AI detected these items. Edit to add/remove details for more accurate transformation.
+            </p>
+          </div>
+        )}
+
+        {previewUrl && sceneAnalysis && (
+          <div className="instructions-container">
+            <label htmlFor="instructions" className="instructions-label">
+              Additional Instructions (Optional)
+            </label>
+            <textarea
+              id="instructions"
+              className="instructions-input"
+              placeholder="e.g., Make it brighter, add warm lighting, change wall color to blue..."
+              value={customInstructions}
+              onChange={(e) => setCustomInstructions(e.target.value)}
+              rows={3}
+            />
+          </div>
+        )}
+
+        {previewUrl && sceneAnalysis && !analyzing && (
           <div className="button-group">
-            {!transformedImage && (
-              <button
-                className="btn btn-primary"
-                onClick={transformImage}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <span className="spinner"></span>
-                    Transforming...
-                  </>
-                ) : (
-                  'Transform to Photorealistic'
-                )}
-              </button>
-            )}
+            <button
+              className="btn btn-primary"
+              onClick={transformImage}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <span className="spinner"></span>
+                  {transformedImage ? 'Refining...' : 'Transforming...'}
+                </>
+              ) : (
+                transformedImage ? 'Refine Result' : 'Transform to Photorealistic'
+              )}
+            </button>
             <button className="btn btn-secondary" onClick={reset}>
               Upload New Image
             </button>

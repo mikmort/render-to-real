@@ -130,6 +130,43 @@
   background: #5568d3;
 }
 
+.instructions-container {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.instructions-label {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.5rem;
+}
+
+.instructions-input {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-family: inherit;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.5rem;
+  resize: vertical;
+  transition: border-color 0.3s ease;
+}
+
+.instructions-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.instructions-input::placeholder {
+  color: #a0aec0;
+}
+
 .button-group {
   display: flex;
   gap: 1rem;
@@ -199,6 +236,66 @@
   margin: 1rem 0;
   text-align: center;
   border: 1px solid #fc8181;
+}
+
+.analyzing-message {
+  background: rgba(255, 255, 255, 0.95);
+  color: #667eea;
+  padding: 1.5rem 2rem;
+  border-radius: 0.75rem;
+  margin: 1.5rem auto;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-weight: 600;
+  font-size: 1.1rem;
+  max-width: 400px;
+}
+
+.analysis-container {
+  max-width: 700px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.analysis-label {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 0.5rem;
+}
+
+.analysis-input {
+  width: 100%;
+  padding: 0.875rem;
+  font-size: 0.95rem;
+  font-family: 'Courier New', Courier, monospace;
+  line-height: 1.6;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.5rem;
+  resize: vertical;
+  transition: border-color 0.3s ease;
+  background: #f7fafc;
+}
+
+.analysis-input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+}
+
+.analysis-hint {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: #718096;
+  font-style: italic;
 }
 
 .App-footer {
