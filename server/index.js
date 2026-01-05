@@ -4,7 +4,8 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { OpenAIClient, AzureKeyCredential } = require('@azure/openai');
+const FormData = require('form-data');
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,12 +41,6 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
-// Initialize Azure OpenAI client
-const client = new OpenAIClient(
-  process.env.AZURE_OPENAI_ENDPOINT,
-  new AzureKeyCredential(process.env.AZURE_OPENAI_API_KEY)
-);
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
@@ -60,36 +55,59 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
 
     console.log('Processing image:', req.file.filename);
 
-    // Read the uploaded image as base64
     const imagePath = path.join(__dirname, '..', 'uploads', req.file.filename);
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = imageBuffer.toString('base64');
-    const imageUrl = `data:${req.file.mimetype};base64,${base64Image}`;
 
-    // Use DALL-E 3 for image generation with the uploaded image as reference
-    const prompt = `Transform this 3D rendered room into a photorealistic image.
-    Maintain the exact same layout, furniture placement, camera angle, and composition.
-    Add realistic lighting, textures, materials, shadows, and subtle imperfections that make it look like a real photograph.
-    Enhance surfaces with realistic materials: wood grain, fabric textures, metal reflections, etc.
-    Keep the same color scheme but make it look naturally lit and photographed with a high-quality camera.`;
+    // Prompt for transforming render to photorealistic
+    const prompt = `Transform this 3D rendered room into a photorealistic photograph.
+Maintain the exact same layout, furniture placement, camera angle, and composition.
+Add realistic lighting, textures, materials, shadows, and subtle imperfections that make it look like a real photograph.
+Enhance surfaces with realistic materials: wood grain, fabric textures, metal reflections, glass transparency, etc.
+Keep the same color scheme but make it look naturally lit and photographed with a high-quality camera.`;
 
-    console.log('Calling Azure OpenAI DALL-E...');
+    console.log('Calling Azure OpenAI GPT-Image-1.5...');
 
-    const deploymentName = process.env.AZURE_OPENAI_DALLE_DEPLOYMENT || 'dall-e-3';
+    // Prepare form data for image-to-image API
+    const formData = new FormData();
+    formData.append('image[]', fs.createReadStream(imagePath));
+    formData.append('prompt', prompt);
+    formData.append('model', process.env.AZURE_OPENAI_IMAGE_MODEL || 'gpt-image-1.5');
+    formData.append('size', '1024x1024');
+    formData.append('quality', 'high');
+    formData.append('n', '1');
 
-    const result = await client.getImages(deploymentName, prompt, {
-      n: 1,
-      size: '1024x1024',
-      quality: 'hd',
-      style: 'natural'
+    // Build the Azure OpenAI endpoint URL
+    const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    const deploymentName = process.env.AZURE_OPENAI_IMAGE_DEPLOYMENT || 'gpt-image-1.5';
+    const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-02-01';
+    const url = `${endpoint}/openai/deployments/${deploymentName}/images/edits?api-version=${apiVersion}`;
+
+    console.log('Endpoint:', url);
+
+    // Make the API request
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'api-key': process.env.AZURE_OPENAI_API_KEY,
+        ...formData.getHeaders()
+      },
+      body: formData
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API Error:', errorText);
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
 
     if (!result.data || result.data.length === 0) {
       throw new Error('No image generated');
     }
 
-    const generatedImageUrl = result.data[0].url;
-    const revisedPrompt = result.data[0].revisedPrompt;
+    // GPT-Image-1.5 returns base64-encoded images
+    const base64Image = result.data[0].b64_json;
+    const imageUrl = `data:image/png;base64,${base64Image}`;
 
     console.log('Image generated successfully');
 
@@ -98,8 +116,8 @@ app.post('/api/transform', upload.single('image'), async (req, res) => {
 
     res.json({
       success: true,
-      imageUrl: generatedImageUrl,
-      revisedPrompt: revisedPrompt
+      imageUrl: imageUrl,
+      revisedPrompt: result.data[0].revised_prompt || prompt
     });
 
   } catch (error) {
